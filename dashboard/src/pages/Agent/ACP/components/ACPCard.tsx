@@ -35,14 +35,17 @@ export function ACPCard({
   onToggleEnabled,
 }: ACPCardProps) {
   const { t } = useTranslation();
+  // Built-ins show their localized name; custom runners show their own id so
+  // each one is distinguishable (e.g. openclaw-main / openclaw-data-analysis).
   const labelKey = runnerLabelKey(runnerKey);
   const label = labelKey ? t(labelKey) : runnerKey;
   const introKey = runnerIntroKey(runnerKey);
+  const customCommand = [config.command, ...(config.args ?? [])]
+    .filter(Boolean)
+    .join(" ");
   const intro = introKey
     ? t(introKey)
-    : t("acp.intro_custom", {
-        command: config.command || t("acp.notSet"),
-      });
+    : customCommand || t("acp.notSet");
   const configured = isConfigured(config);
   const icon = runnerIcon(runnerKey);
   // Under sandbox, block turning runners on; still allow turning them off
