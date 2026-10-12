@@ -58,10 +58,19 @@ export function runnerIcon(key: string): string {
   return RUNNER_ICONS[key] ?? customRunnerIcon;
 }
 
-export function runnerLabelKey(key: string): string {
-  return RUNNER_LABEL_KEYS[key] ?? "acp.runner_custom";
+/**
+ * Localized label key for a built-in runner. Custom runners return `null` so
+ * the caller can display the runner id itself (each custom runner has its own
+ * id, so ids are what distinguishes them in the grid).
+ */
+export function runnerLabelKey(key: string): string | null {
+  return RUNNER_LABEL_KEYS[key] ?? null;
 }
 
-export function runnerIntroKey(key: string): string {
-  return RUNNER_INTRO_KEYS[key] ?? "acp.intro_custom";
+/**
+ * Localized intro key for a built-in runner. Custom runners return `null` so
+ * the caller can render the actual command line instead of a generic string.
+ */
+export function runnerIntroKey(key: string): string | null {
+  return RUNNER_INTRO_KEYS[key] ?? null;
 }
