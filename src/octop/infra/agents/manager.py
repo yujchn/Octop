@@ -26,6 +26,10 @@ from octop.i18n.domains.agents import (
 )
 from octop.infra.agents.memory.backend import memory_backend_from_agent_config
 from octop.infra.agents.memory.slim import MemorySlimCoordinator
+from octop.infra.agents.acp_passthrough import (
+    resolve_passthrough_config,
+    stream_acp_passthrough,
+)
 from octop.infra.agents.providers import ProviderStore, sync_providers_to_harness
 from octop.infra.agents.security import SecuritySettingsStore, ToolGuardRulesStore
 from octop.infra.agents.security.hitl_session import (
@@ -1755,6 +1759,13 @@ class AgentManager:
             self._track_invocation(agent_id),
         ):
             self._apply_pending_bootstrap_graph_refresh(agent_id)
+            passthrough_cfg = resolve_passthrough_config(self.get_config(agent_id))
+            if passthrough_cfg is not None:
+                async for chunk in stream_acp_passthrough(
+                    self, agent_id, thread_id, request, passthrough_cfg
+                ):
+                    yield chunk
+                return
             req = self._prepare_stream_request(agent_id, request)
             with (
                 hitl_thread_scope(thread_id_from_request(req)),
