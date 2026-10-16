@@ -1,5 +1,9 @@
 import { request } from "../request";
-import type { ACPConfig, ACPRunnerConfig } from "../types/acp";
+import type {
+  ACPConfig,
+  ACPPassthroughConfig,
+  ACPRunnerConfig,
+} from "../types/acp";
 
 function agentPath(agentId: string, suffix = ""): string {
   return `/agents/${encodeURIComponent(agentId)}/acp${suffix}`;
@@ -58,6 +62,17 @@ export const acpApi = {
       method: "PUT",
       body: JSON.stringify({ tool_enabled }),
     }),
+
+  getPassthrough: (agentId: string) =>
+    request<{ acp_passthrough: ACPPassthroughConfig | null }>(
+      `${agentPath(agentId)}/passthrough`,
+    ),
+
+  updatePassthrough: (agentId: string, body: ACPPassthroughConfig) =>
+    request<{ acp_passthrough: ACPPassthroughConfig | null }>(
+      `${agentPath(agentId)}/passthrough`,
+      { method: "PUT", body: JSON.stringify(body) },
+    ),
 
   /** @deprecated Prefer acpApi.updateRunner */
   updateAgentRunner: (

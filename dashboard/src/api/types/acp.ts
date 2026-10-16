@@ -17,6 +17,14 @@ export interface ACPConfig {
   runners: Record<string, ACPRunnerConfig>;
 }
 
+export interface ACPPassthroughConfig {
+  enabled: boolean;
+  runner: string;
+  cwd?: string | null;
+  max_runtime?: number | null;
+  start_prompt?: string | null;
+}
+
 export function parseArgsText(value: unknown): string[] {
   return String(value || "")
     .split("\n")

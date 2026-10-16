@@ -60,6 +60,14 @@ class ACPAgentToolBody(BaseModel):
     )
 
 
+class ACPPassthroughBody(BaseModel):
+    enabled: bool = False
+    runner: str = ""
+    cwd: str | None = None
+    max_runtime: float | None = None
+    start_prompt: str | None = None
+
+
 def _registry(server: Any) -> Any:
     assert server.app_runtime is not None
     return server.app_runtime.agent_registry
@@ -89,6 +97,62 @@ def _read_agent_tool_enabled(cfg: dict[str, Any]) -> bool:
     if not isinstance(acp, dict):
         return False
     return bool(acp.get("tool_enabled", False))
+
+
+def _read_agent_passthrough(cfg: dict[str, Any]) -> dict[str, Any] | None:
+    raw = cfg.get("acp_passthrough")
+    if not isinstance(raw, dict):
+        return None
+    return raw
+
+
+def _normalize_passthrough(
+    body: ACPPassthroughBody,
+    *,
+    registry: Any,
+    user_id: int,
+) -> dict[str, Any] | None:
+    """Return the normalized ``acp_passthrough`` block, or None to disable.
+
+    ``enabled=False`` or an empty runner disables passthrough (deletes the key).
+    A non-empty runner must exist and be enabled for the current user.
+    """
+    runner = body.runner.strip()
+    if not body.enabled or not runner:
+        return None
+    runners = registry.acp_settings.load_runners(user_id)
+    runner_cfg = runners.get(runner)
+    if runner_cfg is None or not bool(runner_cfg.get("enabled")):
+        raise OctopError(
+            ErrorCode.SLASH_BAD_ARGS,
+            f"ACP passthrough runner {runner!r} is not configured or disabled",
+        )
+    normalized: dict[str, Any] = {"runner": runner}
+    if body.cwd and body.cwd.strip():
+        normalized["cwd"] = body.cwd.strip()
+    if body.max_runtime is not None:
+        normalized["max_runtime"] = body.max_runtime
+    if body.start_prompt and body.start_prompt.strip():
+        normalized["start_prompt"] = body.start_prompt.strip()
+    return normalized
+
+
+async def _persist_agent_passthrough(
+    server: Any,
+    *,
+    agent_id: str,
+    body: ACPPassthroughBody,
+    user_id: int,
+) -> dict[str, Any] | None:
+    registry = _registry(server)
+    normalized = _normalize_passthrough(body, registry=registry, user_id=user_id)
+    cfg = registry.get_config(agent_id)
+    if normalized is None:
+        cfg.pop("acp_passthrough", None)
+    else:
+        cfg["acp_passthrough"] = normalized
+    await registry.update_config_json(agent_id, json.dumps(cfg, ensure_ascii=False))
+    return _read_agent_passthrough(cfg)
 
 
 def _combined_acp_view(*, registry: Any, user_id: int, agent_cfg: dict[str, Any]) -> dict[str, Any]:
@@ -263,6 +327,34 @@ async def put_acp_tool_toggle(
     registry = _registry(server)
     cfg = registry.get_config(agent_id)
     return {"tool_enabled": _read_agent_tool_enabled(cfg)}
+
+
+@router.get("/agents/{agent_id}/acp/passthrough", summary="Get ACP passthrough config")
+async def get_acp_passthrough(
+    agent_id: str,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    """Return the per-agent ``acp_passthrough`` block, or null when disabled."""
+    _agent_row(server, agent_id, user)
+    registry = _registry(server)
+    cfg = registry.get_config(agent_id)
+    return {"acp_passthrough": _read_agent_passthrough(cfg)}
+
+
+@router.put("/agents/{agent_id}/acp/passthrough", summary="Update ACP passthrough config")
+async def put_acp_passthrough(
+    agent_id: str,
+    body: ACPPassthroughBody,
+    user: Any = Depends(current_user),
+    server: Any = Depends(get_server),
+) -> dict[str, Any]:
+    """Enable/disable ACP passthrough and persist its normalized block."""
+    _agent_row(server, agent_id, user)
+    saved = await _persist_agent_passthrough(
+        server, agent_id=agent_id, body=body, user_id=user.id
+    )
+    return {"acp_passthrough": saved}
 
 
 @router.get("/agents/{agent_id}/acp/{runner_name}", summary="Get ACP runner")
