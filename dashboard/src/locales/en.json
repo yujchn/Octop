@@ -6040,7 +6040,20 @@
     "deleteConfirm": "This custom runner will be removed.",
     "deleteSuccess": "Runner deleted",
     "docsHint": "Install an ACP-compatible agent locally (opencode, codebuddy --acp, etc.) before enabling a runner.",
-    "chatPermissionTitle": "External agent permission required"
+    "chatPermissionTitle": "External agent permission required",
+    "passthroughTitle": "ACP passthrough (forward to external agent)",
+    "passthroughHint": "When enabled, this agent's turns are forwarded directly to the selected external runner instead of the built-in model.",
+    "passthroughNoRunnerHint": "Enable a runner first before configuring passthrough. Enable one in the cards above.",
+    "passthroughRunnerLabel": "Target runner",
+    "passthroughRunnerRequired": "Please select a target runner",
+    "passthroughRunnerPlaceholder": "Select an enabled runner",
+    "passthroughCwdLabel": "Working directory (optional)",
+    "passthroughCwdPlaceholder": "Leave empty to use the agent workspace",
+    "passthroughMaxRuntimeLabel": "Max runtime (seconds, optional)",
+    "passthroughStartPromptLabel": "Start prompt (optional)",
+    "passthroughStartPromptPlaceholder": "Leave empty to use the default start prompt",
+    "passthroughSaved": "ACP passthrough config saved",
+    "passthroughSaveFailed": "Failed to save ACP passthrough config"
   },
   "plugins": {
     "loadError": "Failed to load plugins",

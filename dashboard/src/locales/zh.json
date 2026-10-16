@@ -6040,7 +6040,20 @@
     "deleteConfirm": "将移除此自定义 Runner。",
     "deleteSuccess": "Runner 已删除",
     "docsHint": "请先在本地安装并配置好 ACP 专家（如 opencode、codebuddy --acp）后再启用 Runner。",
-    "chatPermissionTitle": "外部专家需要权限确认"
+    "chatPermissionTitle": "外部专家需要权限确认",
+    "passthroughTitle": "ACP 直通（转发到外部 agent）",
+    "passthroughHint": "开启后，此专家的对话将直接转发到指定外部 Runner，而不是使用内置模型。",
+    "passthroughNoRunnerHint": "需要先启用某个 Runner 才能配置直通。请在上方卡片中启用一个 Runner。",
+    "passthroughRunnerLabel": "目标 Runner",
+    "passthroughRunnerRequired": "请选择目标 Runner",
+    "passthroughRunnerPlaceholder": "选择一个已启用的 Runner",
+    "passthroughCwdLabel": "工作目录（可选）",
+    "passthroughCwdPlaceholder": "留空则使用专家 workspace",
+    "passthroughMaxRuntimeLabel": "最大运行时长（秒，可选）",
+    "passthroughStartPromptLabel": "启动提示（可选）",
+    "passthroughStartPromptPlaceholder": "留空则使用默认启动提示",
+    "passthroughSaved": "ACP 直通配置已保存",
+    "passthroughSaveFailed": "保存 ACP 直通配置失败"
   },
   "plugins": {
     "loadError": "加载插件失败",

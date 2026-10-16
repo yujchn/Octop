@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, App, Button, Empty, Form, Switch } from "antd";
+import { Alert, App, Button, Empty, Form, Input, InputNumber, Select, Switch } from "antd";
 
 import { useTranslation } from "react-i18next";
 import PageShell from "../../../layouts/PageShell";
@@ -8,6 +8,7 @@ import PeerOnlyRemoteAlert from "../../../components/PeerOnlyRemoteAlert";
 import { acpApi } from "../../../api/modules/acp";
 import {
   ACP_DEFAULT_STDIO_BUFFER_LIMIT_BYTES,
+  type ACPPassthroughConfig,
   type ACPRunnerConfig,
 } from "../../../api/types/acp";
 import { useAgent } from "../../../context/AgentContext";
@@ -51,6 +52,10 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form] = Form.useForm();
+  const [passthroughEnabled, setPassthroughEnabled] = useState(false);
+  const [passthroughLoading, setPassthroughLoading] = useState(false);
+  const [passthroughSaving, setPassthroughSaving] = useState(false);
+  const [passthroughForm] = Form.useForm();
   const activeAgentIdRef = useRef(activeAgentId);
 
   const activeAgent = useMemo(
@@ -125,6 +130,47 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
     };
   }, [activeAgentId, t]);
 
+  useEffect(() => {
+    if (!activeAgentId) {
+      setPassthroughEnabled(false);
+      setPassthroughLoading(false);
+      passthroughForm.resetFields();
+      return;
+    }
+
+    const agentId = activeAgentId;
+    setPassthroughLoading(true);
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await acpApi.getPassthrough(agentId);
+        if (!cancelled && activeAgentIdRef.current === agentId) {
+          const cfg = data.acp_passthrough;
+          setPassthroughEnabled(Boolean(cfg));
+          passthroughForm.setFieldsValue({
+            runner: cfg?.runner || undefined,
+            cwd: cfg?.cwd || undefined,
+            max_runtime: cfg?.max_runtime ?? undefined,
+            start_prompt: cfg?.start_prompt || undefined,
+          });
+        }
+      } catch {
+        if (!cancelled && activeAgentIdRef.current === agentId) {
+          message.error(t("acp.loadFailed"));
+        }
+      } finally {
+        if (!cancelled && activeAgentIdRef.current === agentId) {
+          setPassthroughLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAgentId, t, passthroughForm]);
+
   const orderedKeys = useMemo(() => {
     const keys = Object.keys(runners || {});
     return [
@@ -132,6 +178,11 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
       ...keys.filter((k) => !isBuiltinRunner(k)).sort(),
     ];
   }, [runners]);
+
+  const enabledRunnerKeys = useMemo(
+    () => orderedKeys.filter((k) => runners[k]?.enabled),
+    [orderedKeys, runners],
+  );
 
   const cards = useMemo(() => {
     const enabled: { key: string; cfg: ACPRunnerConfig }[] = [];
@@ -175,6 +226,41 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
       message.error(t("acp.configFailed"));
     } finally {
       setToolToggleLoading(false);
+    }
+  };
+
+  const handlePassthroughToggle = (checked: boolean) => {
+    setPassthroughEnabled(checked);
+  };
+
+  const handlePassthroughSave = async () => {
+    const agentId = activeAgentIdRef.current;
+    if (!agentId || passthroughLoading) return;
+    let values: Record<string, unknown>;
+    try {
+      values = await passthroughForm.validateFields();
+    } catch {
+      return;
+    }
+    const body: ACPPassthroughConfig = {
+      enabled: passthroughEnabled,
+      runner: String(values.runner ?? ""),
+      cwd: values.cwd ? String(values.cwd) : null,
+      max_runtime:
+        values.max_runtime === undefined || values.max_runtime === null
+          ? null
+          : Number(values.max_runtime),
+      start_prompt: values.start_prompt ? String(values.start_prompt) : null,
+    };
+    setPassthroughSaving(true);
+    try {
+      const data = await acpApi.updatePassthrough(agentId, body);
+      setPassthroughEnabled(Boolean(data.acp_passthrough));
+      message.success(t("acp.passthroughSaved"));
+    } catch {
+      message.error(t("acp.passthroughSaveFailed"));
+    } finally {
+      setPassthroughSaving(false);
     }
   };
 
@@ -342,6 +428,94 @@ export function ACPPanel({ agentId: agentIdProp }: ACPPanelProps = {}) {
             <span>{t("acp.toolEnabled")}</span>
             {toolSwitch}
           </div>
+        )}
+      </div>
+
+      <div className={styles.passthroughSection}>
+        <div className={styles.toolToggle}>
+          <span>{t("acp.passthroughTitle")}</span>
+          <Switch
+            checked={passthroughEnabled}
+            loading={passthroughLoading}
+            disabled={!activeAgentId || passthroughLoading}
+            onChange={handlePassthroughToggle}
+          />
+        </div>
+        {!activeAgentId ? (
+          <Empty
+            description={t("mbtiPage.pickAgent")}
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        ) : (
+          <>
+            <p className={styles.scopeHint}>{t("acp.passthroughHint")}</p>
+            {passthroughEnabled && enabledRunnerKeys.length === 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                className={styles.passthroughAlert}
+                message={t("acp.passthroughNoRunnerHint")}
+              />
+            ) : null}
+            {passthroughEnabled ? (
+              <Form
+                form={passthroughForm}
+                layout="vertical"
+                className={styles.passthroughForm}
+              >
+                <Form.Item
+                  label={t("acp.passthroughRunnerLabel")}
+                  name="runner"
+                  rules={[
+                    {
+                      required: true,
+                      message: t("acp.passthroughRunnerRequired"),
+                    },
+                  ]}
+                >
+                  <Select
+                    placeholder={t("acp.passthroughRunnerPlaceholder")}
+                    options={enabledRunnerKeys.map((key) => ({
+                      value: key,
+                      label: key,
+                    }))}
+                  />
+                </Form.Item>
+                <Form.Item
+                  label={t("acp.passthroughCwdLabel")}
+                  name="cwd"
+                >
+                  <Input placeholder={t("acp.passthroughCwdPlaceholder")} />
+                </Form.Item>
+                <Form.Item
+                  label={t("acp.passthroughMaxRuntimeLabel")}
+                  name="max_runtime"
+                >
+                  <InputNumber
+                    min={1}
+                    placeholder="300"
+                    style={{ width: "100%" }}
+                  />
+                </Form.Item>
+                <Form.Item
+                  label={t("acp.passthroughStartPromptLabel")}
+                  name="start_prompt"
+                >
+                  <Input
+                    placeholder={t("acp.passthroughStartPromptPlaceholder")}
+                  />
+                </Form.Item>
+              </Form>
+            ) : null}
+            <Button
+              type="primary"
+              loading={passthroughSaving}
+              disabled={passthroughLoading}
+              onClick={handlePassthroughSave}
+            >
+              {t("common.save")}
+            </Button>
+          </>
         )}
       </div>
 
